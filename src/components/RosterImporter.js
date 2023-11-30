@@ -1,4 +1,5 @@
 import React, { useState , useRef} from 'react';
+import Papa from 'papaparse';
 import PlayerDetails from './PlayerDetails';
 
 const RosterImporter = ({ onRosterUpdate }) => {
@@ -47,43 +48,33 @@ const handleFileChange = async (e) => {
 };
 
 const processCSVData = (csvData, file) => {
-  const rows = csvData.split('\n');
-  const headers = rows[0].split(',');
-
-  const data = rows.slice(1).map((row) => {
-    const values = row.split(',');
-    return headers.reduce((obj, header, index) => {
-      obj[header.trim()] = values[index].trim();
-      return obj;
-    }, {});
-  });
-
-  const errors = [];
-
-  // Check for empty values
-  data.forEach((item, index) => {
-    Object.keys(item).forEach((key) => {
-      if (item[key].trim() === '') {
-        errors.push(`Your sheet is missing data. Please ensure all cells are filled out.`);
-      }
+  try {
+    const { data, errors } = Papa.parse(csvData, {
+      header: true, // Treat the first row as headers
+      skipEmptyLines: true, // Skip empty lines
     });
-  });
 
-  // Check for file extension
-  const fileExtension = file.name.split('.').pop().toLowerCase();
-  if (fileExtension !== 'csv') {
-    errors.push('Invalid file format. Please select a .csv file.');
+    if (errors.length === 0) {
+      const requiredFields = ['Player Name', 'Position']; // Add other required fields
+      const missingFields = requiredFields.filter((field) => !Object.keys(data[0]).includes(field));
+
+      if (missingFields.length === 0) {
+        return { data, errors: [] };
+      } else {
+        return { data: null, errors: [`Missing fields: ${missingFields.join(', ')}`] };
+      }
+    } else {
+      return { data: null, errors: ['Error parsing CSV data.'] };
+    }
+  } catch (error) {
+    console.error('Error parsing CSV data:', error);
+    return { data: null, errors: ['Error reading the file.'] };
   }
-
-  // Check for missing fields
-  const requiredFields = ['Player Name', 'Position']; // Add other required fields
-  const missingFields = requiredFields.filter((field) => !headers.includes(field));
-  if (missingFields.length > 0) {
-    errors.push(`Missing fields: ${missingFields.join(', ')}`);
-  }
-
-  return { data, errors };
 };
+
+
+
+
 const handleImport = async () => {
   if (imported) {
     // Reset import state and clear data
